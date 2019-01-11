@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Table, ForeignKey, FLOAT
+from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
 from database.database import Base
@@ -13,7 +14,7 @@ class NameBase:
 
 class Group(Base, NameBase):
     """
-    Group model for products (i.e: family, range etc.)
+    Group model for products (i.e: family, range etc.) - more specific classification than Type.
     """
     __tablename__ = 'groups'
     group_id = Column(Integer, primary_key=True)
@@ -29,7 +30,8 @@ class Tag(Base, NameBase):
 
 class ProductType(Base, NameBase):
     """
-    Product type model. Use as a general classification for whole set of products (i.e. edibles, machines etc.)
+    Product type model. Use as a general classification for whole set of products (i.e. edibles,
+     machines etc.) Use Group as more specific classification.
     """
     __tablename__ = 'product_types'
     product_type_id = Column(Integer, primary_key=True)
@@ -37,7 +39,7 @@ class ProductType(Base, NameBase):
 
 class Material(Base, NameBase):
     """
-    Model of a basic component of a product.
+    Model of a basic material of a product. (i. e. sugar, grams)
     """
     __tablename__ = 'materials'
     material_id = Column(Integer, primary_key=True)
@@ -97,25 +99,40 @@ class Product(Base, NameBase):
 product_allergens = Table(
     'product_allergens',
     Base.metadata,
-    Column('product_id', Integer, ForeignKey('products.product_id')),
+    Column('product_id', Integer, ForeignKey('food_products.product_id')),
     Column('allergen_id', Integer, ForeignKey('allergens.allergen_id'))
 )
 
 
-class FoodProduct(Product):
+class ProductMixin:
+    """
+    Adds product_id to specific product types.
+    """
+    @declared_attr
+    def product_id(cls):
+        return Column('product_id', ForeignKey('products.product_id'))
+
+    @declared_attr
+    def product(cls):
+        return relationship("Product")
+
+
+class FoodProduct(ProductMixin, Base):
     """
     Food product model class.
     """
     __tablename__ = 'food_products'
+    food_product_id = Column(Integer, primary_key=True)
     allergens = relationship('Allergen', secondary=product_allergens)
     customer_id = Column(Integer, ForeignKey('customers.customer_id'))
     customer = relationship('Customer', backref='food_products')
 
 
-class TextileProduct(Product):
+class TextileProduct(ProductMixin, Base):
     """
     Textile product model class.
     """
     __tablename__ = 'textile_products'
+    textile_product_id = Column(Integer, primary_key=True)
     colour = Column(String(50))
 
