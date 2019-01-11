@@ -1,11 +1,75 @@
-from sqlalchemy import Column, Integer, String, Table, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, Table, ForeignKey, FLOAT
 from sqlalchemy.orm import relationship
 
 from database.database import Base
 
 
 class NameBase:
+    """
+    Base class for all models requiring a unique name field.
+    """
     name = Column(String(50), unique=True)
+
+
+class Group(Base, NameBase):
+    """
+    Group model for products (i.e: family, range etc.)
+    """
+    __tablename__ = 'groups'
+    group_id = Column(Integer, primary_key=True)
+
+
+class Tag(Base, NameBase):
+    """
+    Tag model for products.
+    """
+    __tablename__ = 'tags'
+    tag_id = Column(Integer, primary_key=True)
+
+
+class ProductType(Base, NameBase):
+    """
+    Product type model. Use as a general classification for whole set of products (i.e. edibles, machines etc.)
+    """
+    __tablename__ = 'product_types'
+    product_type_id = Column(Integer, primary_key=True)
+
+
+class Material(Base, NameBase):
+    """
+    Model of a basic component of a product.
+    """
+    __tablename__ = 'materials'
+    material_id = Column(Integer, primary_key=True)
+    units = Column(String(50))
+
+
+class Allergen(Base, NameBase):
+    """
+    Model for an allergen in food product.
+    """
+    __tablename__ = 'allergens'
+    allergen_id = Column(Integer, primary_key=True)
+
+
+class Customer(Base, NameBase):
+    """
+    Model for customer.
+    """
+    __tablename__ = 'customers'
+    customer_id = Column(Integer, primary_key=True)
+
+
+class ProductComponent(Base):
+    """
+    Model for an actual constituent of a product (i.e. 20g of sugar etc.)
+    """
+    __tablename__ = 'product_components'
+    product_component_id = Column(Integer, primary_key=True)
+    material_id = Column(Integer, ForeignKey('materials.material_id'))
+    material = relationship('Material', backref='product_components')
+    quantity = Column(FLOAT)
+    product_id = Column(Integer, ForeignKey('products.product_id'))
 
 
 product_tag = Table(
@@ -17,6 +81,9 @@ product_tag = Table(
 
 
 class Product(Base, NameBase):
+    """
+    Base product model to be extended by specific product types.
+    """
     __tablename__ = 'products'
     product_id = Column(Integer, primary_key=True)
     group_id = Column(Integer, ForeignKey('groups.group_id'))
@@ -24,35 +91,31 @@ class Product(Base, NameBase):
     tags = relationship('Tag', secondary=product_tag)
     product_type_id = Column(Integer, ForeignKey('product_types.product_type_id'))
     product_type = relationship('ProductType', backref='products')
-    materials = relationship('ProductComponent')
+    product_components = relationship('ProductComponent')
 
 
-class Group(Base, NameBase):
-    __tablename__ = 'groups'
-    group_id = Column(Integer, primary_key=True)
+product_allergens = Table(
+    'product_allergens',
+    Base.metadata,
+    Column('product_id', Integer, ForeignKey('products.product_id')),
+    Column('allergen_id', Integer, ForeignKey('allergens.allergen_id'))
+)
 
 
-class Tag(Base, NameBase):
-    __tablename__ = 'tags'
-    tag_id = Column(Integer, primary_key=True)
+class FoodProduct(Product):
+    """
+    Food product model class.
+    """
+    __tablename__ = 'food_products'
+    allergens = relationship('Allergen', secondary=product_allergens)
+    customer_id = Column(Integer, ForeignKey('customers.customer_id'))
+    customer = relationship('Customer', backref='food_products')
 
 
-class ProductType(Base, NameBase):
-    __tablename__ = 'product_types'
-    product_type_id = Column(Integer, primary_key=True)
-
-
-class Material(Base, NameBase):
-    __tablename__ = 'materials'
-    material_id = Column(Integer, primary_key=True)
-    units = Column(String(50))
-
-
-class ProductComponent(Base):
-    __tablename__ = 'product_components'
-    product_component_id = Column(Integer, primary_key=True)
-    material_id = Column(Integer, ForeignKey('materials.material_id'))
-    material = relationship('Material', backref='product_components')
-    quantity = Column(Numeric, precision=2)
-    product_id = Column(Integer, ForeignKey('products.product_id'))
+class TextileProduct(Product):
+    """
+    Textile product model class.
+    """
+    __tablename__ = 'textile_products'
+    colour = Column(String(50))
 
