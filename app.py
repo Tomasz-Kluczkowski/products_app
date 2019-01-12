@@ -44,7 +44,7 @@ PRODUCT_RELATIONS = 'product_relations'
 INDEPENDENT = 'independent'
 FOOD_PRODUCT = 'food_product'
 TEXTILE_PRODUCT = 'textile_product'
-PRODUCT_DEPENDENT = 'common_dependent'
+PRODUCT_DEPENDENT = 'product_dependent'
 INDUSTRY_DEPENDENT = 'industry_dependent'
 
 # convert fields to appropriate application table names
@@ -149,8 +149,6 @@ class ProductCreator:
                         self.objects[obj_name] = get_or_create_multiple(object_class, data=data)
                         db_session.add_all(self.objects[obj_name])
                     else:
-                        # here in case in the future our independent models need more than just the name field
-                        # we will need to build object kwargs same as for the products.
                         self.objects[obj_name], _ = get_or_create(object_class, name=self.data[obj_name])
                         db_session.add(self.objects[obj_name])
 
@@ -201,5 +199,6 @@ def products():
         return 'Product created', HTTPStatus.CREATED
     else:
         # Retrieve all products here
+
         retrieved_products = []
         return json.dumps(retrieved_products)
