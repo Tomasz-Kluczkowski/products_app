@@ -75,7 +75,6 @@ BASE_FIELDS = {
     TEXTILE_PRODUCT: [NAME, GROUP, COLOUR],
 }
 
-
 if not database_exists('sqlite:///products.db'):
     init_db()
 
@@ -110,7 +109,7 @@ class ProductCreator:
         INDEPENDENT object names to exist first. Product is then flushed to the database but not committed.
         :return: product, instance of a product
         """
-        product_class = get_class_by_table_name(f'{self.product_type}_products')
+        product_class = get_class_by_table_name(f'{self.product_type}_product')
         if product_class:
             # build kwargs for product
             product_kwargs = {}
@@ -119,7 +118,7 @@ class ProductCreator:
                     product_kwargs[field] = self.objects[field]
                 else:
                     product_kwargs[field] = self.data[field]
-            product = get_or_create(product_kwargs, **product_kwargs)
+            product, _ = get_or_create(product_class, **product_kwargs)
             db_session.add(product)
             db_session.flush()
             self.objects['product_id'] = product.id
@@ -145,14 +144,14 @@ class ProductCreator:
                     if multiple:
                         # inject product id into data dictionary for objects that need it as a field.
                         if obj_name in OBJECT_NAMES[PRODUCT_DEPENDENT]:
-                            for key, value in data.values():
+                            for key, value in data.items():
                                 value['product_id'] = self.objects['product_id']
                         self.objects[obj_name] = get_or_create_multiple(object_class, data=data)
                         db_session.add_all(self.objects[obj_name])
                     else:
                         # here in case in the future our independent models need more than just the name field
                         # we will need to build object kwargs same as for the products.
-                        self.objects[obj_name] = get_or_create(object_class, name=self.data[obj_name])
+                        self.objects[obj_name], _ = get_or_create(object_class, name=self.data[obj_name])
                         db_session.add(self.objects[obj_name])
 
     def create_product_from_data(self):
@@ -162,11 +161,13 @@ class ProductCreator:
         # create independent objects first: tags, group (family, range), customer as they do not need
         # anything to exist.
         self._create_objects(OBJECT_NAMES[INDEPENDENT])
+
         # create product dependencies in database (ids will be needed to save the product object in next step)
         db_session.flush()
         base_product = self._create_base_product()
         # now create common product dependent objects.
         self._create_objects(OBJECT_NAMES[PRODUCT_DEPENDENT])
+
         # create industry specific dependent objects.
         related_fields = RELATED_FIELDS
         if OBJECT_NAMES[INDUSTRY_DEPENDENT].get(self.product_type):
@@ -176,14 +177,8 @@ class ProductCreator:
         # append dependant objects to product
         for field in related_fields:
             # add objects to appropriate fields
-            getattr(base_product, field).append(self.objects[field])
+            getattr(base_product, field).extend(self.objects[field])
         db_session.commit()
-
-
-
-
-
-
 
 
 @app.route('/products', methods=['GET', 'POST'])
@@ -198,62 +193,11 @@ def products():
         print(json_data)
         product_name = json_data.get('name')
         print(product_name)
-        # Here we will need to create a possibility of inserting many objects at once. For now only one.
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
             return 'Product already in database'
 
         product_creator = ProductCreator(data=json_data, product_type=api_key)
-
-
-        # # create common objects for product
-        # group, _ = get_or_create(Group, name=json_data[PRODUCT_GROUPS[api_key]])
-        #
-        # tag_names = json_data.get('tags')
-        # tags = get_or_create_multiple(Tag, data=tag_names)
-        #
-        # # product_type = get_or_create(db_session, ProductType, name=api_key)
-        #
-        # product_components = json_data.get('billOfMaterials')
-        # materials = []
-        # # for key in product_components:
-        # #     pass
-        #
-        # # if product_type = db_session.query(ProductType).filter_by(name='food').one()
-        # product_class = get_class_by_table_name(f'{api_key}_products')
-        # print('product class', product_class)
-
-
-
-
-
-
-
-
-
-        # tag = Tag(name='test_tag_113')
-        # # product_type = db_session.query(ProductType).filter_by(name='food').one()
-        # # product_type = ProductType(name='food')
-        # group = Group(name='Fizzy Drinks')
-        # customer = Customer(name='Sainsbury')
-        # allergen = Allergen(name='Chili')
-        # db_session.add_all([tag, group, customer, allergen])
-        # # db_session.add(product_type)
-        # food_product = FoodProduct(name='Sprite', group=group, customer=customer)
-        #
-        # food_product.tags.append(tag)
-        # db_session.add(food_product)
-        # db_session.commit()
-        # material = Material(name='Sugar', units='grams', quantity=20, product_id=food_product.id)
-        # db_session.add(material)
-        # db_session.commit()
-        #
-        # food_product.allergens.append(allergen)
-        # db_session.add(food_product)
-        # db_session.commit()
-
-
-        # Create product here
-
+        product_creator.create_product_from_data()
         return 'Product created', HTTPStatus.CREATED
     else:
         # Retrieve all products here

@@ -32,10 +32,12 @@ def get_or_create_multiple(model, data):
     """
     objs = []
     for item in data:
+        print('data in get_or_create_multiple', data)
+
         obj = None
-        if isinstance(data, str):
+        if isinstance(data, list):
             obj, _ = get_or_create(model, name=item)
-        elif isinstance(data[item], dict):
+        elif isinstance(data, dict):
             model_kwargs = dict()
             model_kwargs['name'] = item
             model_kwargs.update(data[item])
