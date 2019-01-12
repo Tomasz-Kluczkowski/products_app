@@ -26,19 +26,29 @@ CUSTOMER = 'customer'
 BILL_OF_MATERIALS = 'billOfMaterials'
 ALLERGENS = 'allergens'
 COLOUR = 'colour'
+GROUPS = 'groups'
 
-GROUPS = {
+PRODUCT_GROUPS = {
     FOOD: FAMILY,
     TEXTILES: RANGE
 }
 
+# object group keys
+PRODUCT_RELATIONS = 'product_relations'
+INDEPENDENT = 'independent'
+FOOD_PRODUCT = 'food_product'
+TEXTILE_PRODUCT = 'textile_product'
+COMMON_DEPENDENT = 'common_dependent'
+FOOD_DEPENDENT = 'food_dependent'
+
+
 PRODUCT_KEYS = {
-    'product_relations': [TAGS, FAMILY, RANGE, CUSTOMER, BILL_OF_MATERIALS, ALLERGENS],
-    'independent': [(TAGS, ), FAMILY, RANGE, CUSTOMER],
-    'food_product': [NAME, FAMILY, CUSTOMER],
-    'textile_product': [NAME, RANGE, COLOUR],
-    'common_dependent': [(BILL_OF_MATERIALS, )],
-    'food_dependent': [(ALLERGENS, )],
+    PRODUCT_RELATIONS: [TAGS, FAMILY, RANGE, CUSTOMER, BILL_OF_MATERIALS, ALLERGENS],
+    INDEPENDENT: [(TAGS, ), FAMILY, RANGE, CUSTOMER],
+    FOOD_PRODUCT: [NAME, FAMILY, CUSTOMER],
+    TEXTILE_PRODUCT: [NAME, RANGE, COLOUR],
+    COMMON_DEPENDENT: [(BILL_OF_MATERIALS, )],
+    FOOD_DEPENDENT: [(ALLERGENS, )],
 }
 
 
@@ -66,8 +76,9 @@ class ProductCreator:
         :param product_type: str, Type of product to create (i.e food, textile.) - use api key.
         :return:
         """
-        # create independent objects first: tags, group (family, range), customer
-        for item in PRODUCT_KEYS['independent']:
+        # create independent objects first: tags, group (family, range), customer as they do not need
+        # anything to exist.
+        for item in PRODUCT_KEYS[INDEPENDENT]:
             multiple = False
             key = item
             if isinstance(item, tuple):
@@ -75,7 +86,7 @@ class ProductCreator:
                 key = item[0]
 
             table_name = key
-            if key in GROUPS.values():
+            if key in PRODUCT_GROUPS.values():
                 table_name = 'groups'
             object_class = get_class_by_table_name(table_name)
 
@@ -87,12 +98,14 @@ class ProductCreator:
                     self.objects[key] = get_or_create(object_class, data=data[key])
                     db_session.add(self.objects[key])
 
-        # create product dependencies in database
+        # create product dependencies in database (ids will be needed to save the product object in next step)
         db_session.flush()
         product_class = get_class_by_table_name(f'{product_type}_products')
         # build kwargs for product
         product_kwargs = {}
         for item in PRODUCT_KEYS[f'{product_type}_product']:
+            if item in PRODUCT_KEYS[PRODUCT_RELATIONS]:
+
             product_kwargs[item] =
         if product_class:
             product =
@@ -111,6 +124,10 @@ def products():
             print('no json data')
             return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
         print(json_data)
+        # copy family or range into group key (makes everything uniform later on).
+        for key in PRODUCT_GROUPS.values():
+            if json_data.get(key):
+                json_data[GROUPS]
 
         product_name = json_data.get('name')
         print(product_name)
