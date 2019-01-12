@@ -7,7 +7,7 @@ from sqlalchemy_utils import database_exists
 
 from database.database import db_session, init_db, Base
 from database.models.models import (
-    Allergen, Customer, FoodProduct, Group, Material, Product, ProductComponent, ProductType, Tag
+    Allergen, Customer, FoodProduct, Group, Material, Product, ProductComponent, Tag
 )
 from utils import get_or_create, get_or_create_multiple
 
@@ -55,18 +55,17 @@ def products():
 
 
         # create common objects for product
-        # 1 = group
         group, _ = get_or_create(db_session, Group, name=GROUPS[api_key])
 
         tag_names = json_data.get('tags')
         tags = get_or_create_multiple(db_session, Tag, data=tag_names)
 
-        product_type = get_or_create(db_session, ProductType, name=api_key)
+        # product_type = get_or_create(db_session, ProductType, name=api_key)
 
         product_components = json_data.get('billOfMaterials')
         materials = []
-        for key in product_components:
-
+        # for key in product_components:
+        #     pass
 
         # if product_type = db_session.query(ProductType).filter_by(name='food').one()
         product_class = get_class_by_tablename(f'{api_key}_products')
@@ -82,23 +81,22 @@ def products():
 
         tag = Tag(name='test_tag_113')
         # product_type = db_session.query(ProductType).filter_by(name='food').one()
-        product_type = ProductType(name='food')
+        # product_type = ProductType(name='food')
         material = Material(name='Sugar', units='grams')
         group = Group(name='Fizzy Drinks')
         customer = Customer(name='Sainsbury')
         allergen = Allergen(name='Chili')
-        db_session.add_all([tag, group, product_type, material, customer, allergen])
+        db_session.add_all([tag, group, material, customer, allergen])
         # db_session.add(product_type)
+        food_product = FoodProduct(name='Sprite', group=group, customer=customer)
+
+        food_product.tags.append(tag)
+        db_session.add(food_product)
         db_session.commit()
-        product = Product(name='Sprite', product_type=product_type, group=group)
-        product.tags.append(tag)
-        db_session.add(product)
-        db_session.commit()
-        product_component = ProductComponent(material=material, quantity=2.1, product_id=product.product_id)
+        product_component = ProductComponent(material=material, quantity=2.1, product_id=food_product.id)
         db_session.add(product_component)
         db_session.commit()
 
-        food_product = FoodProduct(customer=customer, product_id=product.product_id)
         food_product.allergens.append(allergen)
         db_session.add(food_product)
         db_session.commit()

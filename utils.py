@@ -29,6 +29,7 @@ def get_or_create_multiple(session, model, data):
     """
     objs = []
     for item in data:
+        obj = None
         if isinstance(data, str):
             obj, _ = get_or_create(session, model, name=item)
         elif isinstance(data, dict):
