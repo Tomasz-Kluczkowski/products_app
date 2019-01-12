@@ -5,18 +5,42 @@ from flask import Flask, request
 from sqlalchemy import exists
 from sqlalchemy_utils import database_exists
 
-from database.database import db_session, init_db, Base
+from database.database import db_session, init_db
 from database.models.models import (
     Allergen, Customer, FoodProduct, Group, Material, Product, ProductComponent, Tag
 )
-from utils import get_or_create, get_or_create_multiple
+from utils import get_or_create, get_or_create_multiple, get_class_by_table_name
 
 app = Flask(__name__)
 
+# industry keys
+FOOD = 'food'
+TEXTILES = 'textiles'
+
+#product field keys
+NAME = 'name'
+TAGS = 'tags'
+FAMILY = 'family'
+RANGE = 'range'
+CUSTOMER = 'customer'
+BILL_OF_MATERIALS = 'billOfMaterials'
+ALLERGENS = 'allergens'
+COLOUR = 'colour'
+
 GROUPS = {
-    'food': 'family',
-    'textiles': 'range'
+    FOOD: FAMILY,
+    TEXTILES: RANGE
 }
+
+PRODUCT_KEYS = {
+    'product_relations': [TAGS, FAMILY, RANGE, CUSTOMER, BILL_OF_MATERIALS, ALLERGENS],
+    'independent': [(TAGS, ), FAMILY, RANGE, CUSTOMER],
+    'food_product': [NAME, FAMILY, CUSTOMER],
+    'textile_product': [NAME, RANGE, COLOUR],
+    'common_dependent': [(BILL_OF_MATERIALS, )],
+    'food_dependent': [(ALLERGENS, )],
+}
+
 
 if not database_exists('sqlite:///products.db'):
     init_db()
@@ -27,14 +51,54 @@ def shutdown_session(exception=None):
     db_session.remove()
 
 
-def get_class_by_tablename(tablename):
-    """Return class reference mapped to table.
-    :param tablename: str, String with name of table.
-    :return: Class reference or None.
+class ProductCreator:
     """
-    for c in Base._decl_class_registry.values():
-        if hasattr(c, '__tablename__') and c.__tablename__ == tablename:
-            return c
+    Use this class to ease product creation.
+    """
+
+    def __init__(self):
+        self.objects = {}
+
+    def create_product_from_data(self, data, product_type):
+        """
+        Creates product and required objects it depends on from data.
+        :param data: dict, Decoded json product data.
+        :param product_type: str, Type of product to create (i.e food, textile.) - use api key.
+        :return:
+        """
+        # create independent objects first: tags, group (family, range), customer
+        for item in PRODUCT_KEYS['independent']:
+            multiple = False
+            key = item
+            if isinstance(item, tuple):
+                multiple = True
+                key = item[0]
+
+            table_name = key
+            if key in GROUPS.values():
+                table_name = 'groups'
+            object_class = get_class_by_table_name(table_name)
+
+            if data.get(key) and object_class:
+                if multiple:
+                    self.objects[key] = get_or_create_multiple(object_class, data=data[key])
+                    db_session.add_all(self.objects[key])
+                else:
+                    self.objects[key] = get_or_create(object_class, data=data[key])
+                    db_session.add(self.objects[key])
+
+        # create product dependencies in database
+        db_session.flush()
+        product_class = get_class_by_table_name(f'{product_type}_products')
+        # build kwargs for product
+        product_kwargs = {}
+        for item in PRODUCT_KEYS[f'{product_type}_product']:
+            product_kwargs[item] =
+        if product_class:
+            product =
+
+
+
 
 
 @app.route('/products', methods=['GET', 'POST'])
@@ -50,15 +114,16 @@ def products():
 
         product_name = json_data.get('name')
         print(product_name)
+        # Here we will need to create a possibility of inserting many objects at once. For now only one.
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
             return 'Product already in database'
 
 
         # create common objects for product
-        group, _ = get_or_create(db_session, Group, name=GROUPS[api_key])
+        group, _ = get_or_create(Group, name=GROUPS[api_key])
 
         tag_names = json_data.get('tags')
-        tags = get_or_create_multiple(db_session, Tag, data=tag_names)
+        tags = get_or_create_multiple(Tag, data=tag_names)
 
         # product_type = get_or_create(db_session, ProductType, name=api_key)
 
@@ -68,7 +133,7 @@ def products():
         #     pass
 
         # if product_type = db_session.query(ProductType).filter_by(name='food').one()
-        product_class = get_class_by_tablename(f'{api_key}_products')
+        product_class = get_class_by_table_name(f'{api_key}_products')
         print('product class', product_class)
 
 
