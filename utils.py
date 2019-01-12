@@ -35,10 +35,12 @@ def get_or_create_multiple(model, data):
         obj = None
         if isinstance(data, str):
             obj, _ = get_or_create(model, name=item)
-        elif isinstance(data, dict):
-            obj, _ = get_or_create(model, **item)
+        elif isinstance(data[item], dict):
+            model_kwargs = dict()
+            model_kwargs['name'] = item
+            model_kwargs.update(data[item])
+            obj, _ = get_or_create(model, **model_kwargs)
         objs.append(obj)
-
     return objs
 
 

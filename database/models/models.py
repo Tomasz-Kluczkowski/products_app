@@ -54,18 +54,6 @@ class Customer(Base, NameBase):
     id = Column(Integer, primary_key=True)
 
 
-# class ProductComponent(Base):
-#     """
-#     Model for an actual constituent of a product (i.e. 20g of sugar etc.)
-#     """
-#     __tablename__ = 'product_component'
-#     product_component_id = Column(Integer, primary_key=True)
-#     material_id = Column(Integer, ForeignKey('material.id'))
-#     material = relationship('Material', backref='product_components')
-#     quantity = Column(FLOAT)
-#     product_id = Column(Integer, ForeignKey('product.id'))
-
-
 product_tag = Table(
     'product_tag',
     Base.metadata,
@@ -83,7 +71,7 @@ class Product(Base, NameBase):
     group_id = Column(Integer, ForeignKey('group.id'))
     group = relationship('Group', backref='products')
     tags = relationship('Tag', secondary=product_tag)
-    product_components = relationship('ProductComponent')
+    materials = relationship('Material')
     type = Column(String(50))
     __mapper_args__ = {
         'polymorphic_identity': 'product',
