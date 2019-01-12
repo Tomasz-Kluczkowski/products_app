@@ -3,13 +3,20 @@ from http import HTTPStatus
 
 from flask import Flask, request
 from sqlalchemy import exists
-from sqlalchemy_utils import database_exists, get_class_by_table
+from sqlalchemy_utils import database_exists
 
 from database.database import db_session, init_db, Base
 from database.models.models import (
     Allergen, Customer, FoodProduct, Group, Material, Product, ProductComponent, ProductType, Tag
 )
+from utils import get_or_create, get_or_create_multiple
+
 app = Flask(__name__)
+
+GROUPS = {
+    'food': 'family',
+    'textiles': 'range'
+}
 
 if not database_exists('sqlite:///products.db'):
     init_db()
@@ -20,20 +27,50 @@ def shutdown_session(exception=None):
     db_session.remove()
 
 
+def get_class_by_tablename(tablename):
+    """Return class reference mapped to table.
+    :param tablename: str, String with name of table.
+    :return: Class reference or None.
+    """
+    for c in Base._decl_class_registry.values():
+        if hasattr(c, '__tablename__') and c.__tablename__ == tablename:
+            return c
+
+
 @app.route('/products', methods=['GET', 'POST'])
 def products():
     api_key = request.headers['X-API-KEY']
     print(api_key)
     if request.method == 'POST':
         json_data = request.get_json()
+        if json_data is None:
+            print('no json data')
+            return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
         print(json_data)
 
+        product_name = json_data.get('name')
+        print(product_name)
+        if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
+            return 'Product already in database'
+
+
         # create common objects for product
-        # if name in database abort
-        # ret = db_session.query(exists().where(SomeObject.field == value)).scalar()
+        # 1 = group
+        group, _ = get_or_create(db_session, Group, name=GROUPS[api_key])
+
+        tag_names = json_data.get('tags')
+        tags = get_or_create_multiple(db_session, Tag, data=tag_names)
+
+        product_type = get_or_create(db_session, ProductType, name=api_key)
+
+        product_components = json_data.get('billOfMaterials')
+        materials = []
+        for key in product_components:
+
+
         # if product_type = db_session.query(ProductType).filter_by(name='food').one()
-        # product_class = get_class_by_table(Base, f'{api_key}_products')
-        # print(product_class)
+        product_class = get_class_by_tablename(f'{api_key}_products')
+        print('product class', product_class)
 
 
 
@@ -65,10 +102,7 @@ def products():
         food_product.allergens.append(allergen)
         db_session.add(food_product)
         db_session.commit()
-        print(product.product_components)
-        if json_data is None:
-            print('no json data')
-            return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
+
 
         # Create product here
 
