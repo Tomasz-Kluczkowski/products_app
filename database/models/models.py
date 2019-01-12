@@ -29,11 +29,13 @@ class Tag(Base, NameBase):
 
 class Material(Base, NameBase):
     """
-    Model of a basic material of a product. (i. e. sugar, grams)
+    Model of material of a product. (i. e. sugar, grams, 20)
     """
     __tablename__ = 'material'
     id = Column(Integer, primary_key=True)
+    quantity = Column(FLOAT)
     units = Column(String(50))
+    product_id = Column(Integer, ForeignKey('product.id'))
 
 
 class Allergen(Base, NameBase):
@@ -52,16 +54,16 @@ class Customer(Base, NameBase):
     id = Column(Integer, primary_key=True)
 
 
-class ProductComponent(Base):
-    """
-    Model for an actual constituent of a product (i.e. 20g of sugar etc.)
-    """
-    __tablename__ = 'product_component'
-    product_component_id = Column(Integer, primary_key=True)
-    material_id = Column(Integer, ForeignKey('material.id'))
-    material = relationship('Material', backref='product_components')
-    quantity = Column(FLOAT)
-    product_id = Column(Integer, ForeignKey('product.id'))
+# class ProductComponent(Base):
+#     """
+#     Model for an actual constituent of a product (i.e. 20g of sugar etc.)
+#     """
+#     __tablename__ = 'product_component'
+#     product_component_id = Column(Integer, primary_key=True)
+#     material_id = Column(Integer, ForeignKey('material.id'))
+#     material = relationship('Material', backref='product_components')
+#     quantity = Column(FLOAT)
+#     product_id = Column(Integer, ForeignKey('product.id'))
 
 
 product_tag = Table(

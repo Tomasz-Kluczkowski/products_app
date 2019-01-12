@@ -17,7 +17,7 @@ app = Flask(__name__)
 FOOD = 'food'
 TEXTILES = 'textiles'
 
-#product field keys
+# product field keys (also some are corresponding table names)
 NAME = 'name'
 TAGS = 'tags'
 FAMILY = 'family'
@@ -26,7 +26,14 @@ CUSTOMER = 'customer'
 BILL_OF_MATERIALS = 'billOfMaterials'
 ALLERGENS = 'allergens'
 COLOUR = 'colour'
-GROUPS = 'groups'
+GROUP = 'group'
+
+# singular table keys
+TAG = 'tag'
+PRODUCT_COMPONENT = 'product_component'
+ALLERGEN = 'allergen'
+MATERIAL = 'material'
+PRODUCT = 'product'
 
 PRODUCT_GROUPS = {
     FOOD: FAMILY,
@@ -41,14 +48,27 @@ TEXTILE_PRODUCT = 'textile_product'
 COMMON_DEPENDENT = 'common_dependent'
 FOOD_DEPENDENT = 'food_dependent'
 
+# convert json keys to appropriate application table names
+TABLE_NAMES = {
+    TAGS: TAG,
+    GROUP: GROUP,
+    CUSTOMER: CUSTOMER,
+    BILL_OF_MATERIALS: MATERIAL,
+    ALLERGENS: ALLERGEN,
+    FOOD_PRODUCT: FOOD_PRODUCT,
+    TEXTILE_PRODUCT: TEXTILE_PRODUCT,
+}
 
-PRODUCT_KEYS = {
-    PRODUCT_RELATIONS: [TAGS, FAMILY, RANGE, CUSTOMER, BILL_OF_MATERIALS, ALLERGENS],
-    INDEPENDENT: [(TAGS, ), FAMILY, RANGE, CUSTOMER],
-    FOOD_PRODUCT: [NAME, FAMILY, CUSTOMER],
-    TEXTILE_PRODUCT: [NAME, RANGE, COLOUR],
+OBJECT_NAMES = {
+    INDEPENDENT: [(TAGS,), GROUP, CUSTOMER],
+    PRODUCT_RELATIONS: [TAGS, GROUP, CUSTOMER, BILL_OF_MATERIALS, ALLERGENS],
     COMMON_DEPENDENT: [(BILL_OF_MATERIALS, )],
     FOOD_DEPENDENT: [(ALLERGENS, )],
+}
+
+BASE_FIELDS = {
+    FOOD_PRODUCT: [NAME, GROUP, CUSTOMER],
+    TEXTILE_PRODUCT: [NAME, GROUP, COLOUR],
 }
 
 
@@ -66,50 +86,65 @@ class ProductCreator:
     Use this class to ease product creation.
     """
 
-    def __init__(self):
+    def __init__(self,data, product_type):
+        self.data = data
+        self.product_type = product_type
         self.objects = {}
+        self._unify_groups()
+        
+    def _unify_groups(self):
+        """
+        Saves any value belonging to a group like field on a common for all products group key.
+        """
+        product_group = PRODUCT_GROUPS[self.product_type]
+        self.data[GROUP] = self.data[product_group]
 
-    def create_product_from_data(self, data, product_type):
+    def _create_base_product(self):
+        """
+        Creates base product without relationships that require its existence formerly. Needs objects from
+        INDEPENDENT object names to exist first. Product is then flushed to the database but not committed.
+        """
+        product_class = get_class_by_table_name(f'{self.product_type}_products')
+        if product_class:
+            # build kwargs for product
+            product_kwargs = {}
+            for field in BASE_FIELDS[f'{self.product_type}_product']:
+                if field in OBJECT_NAMES[PRODUCT_RELATIONS]:
+                    product_kwargs[field] = self.objects[field]
+                else:
+                    product_kwargs[field] = self.data[field]
+            product = get_or_create(product_kwargs, **product_kwargs)
+            db_session.add(product)
+            db_session.flush()
+
+    def create_product_from_data(self):
         """
         Creates product and required objects it depends on from data.
-        :param data: dict, Decoded json product data.
-        :param product_type: str, Type of product to create (i.e food, textile.) - use api key.
-        :return:
         """
         # create independent objects first: tags, group (family, range), customer as they do not need
         # anything to exist.
-        for item in PRODUCT_KEYS[INDEPENDENT]:
+        for obj_name in OBJECT_NAMES[INDEPENDENT]:
             multiple = False
-            key = item
-            if isinstance(item, tuple):
+            if isinstance(obj_name, tuple):
                 multiple = True
-                key = item[0]
+                obj_name = obj_name[0]
 
-            table_name = key
-            if key in PRODUCT_GROUPS.values():
-                table_name = 'groups'
+            table_name = TABLE_NAMES[obj_name]
             object_class = get_class_by_table_name(table_name)
 
-            if data.get(key) and object_class:
+            if self.data.get(obj_name) and object_class:
                 if multiple:
-                    self.objects[key] = get_or_create_multiple(object_class, data=data[key])
-                    db_session.add_all(self.objects[key])
+                    self.objects[obj_name] = get_or_create_multiple(object_class, data=self.data[obj_name])
+                    db_session.add_all(self.objects[obj_name])
                 else:
-                    self.objects[key] = get_or_create(object_class, data=data[key])
-                    db_session.add(self.objects[key])
+                    # here in case in the future our independent models need more than just the name we will
+                    # need to build object kwargs same as for the products.
+                    self.objects[obj_name] = get_or_create(object_class, name=self.data[obj_name])
+                    db_session.add(self.objects[obj_name])
 
         # create product dependencies in database (ids will be needed to save the product object in next step)
         db_session.flush()
-        product_class = get_class_by_table_name(f'{product_type}_products')
-        # build kwargs for product
-        product_kwargs = {}
-        for item in PRODUCT_KEYS[f'{product_type}_product']:
-            if item in PRODUCT_KEYS[PRODUCT_RELATIONS]:
-
-            product_kwargs[item] =
-        if product_class:
-            product =
-
+        self._create_base_product()
 
 
 
@@ -125,9 +160,9 @@ def products():
             return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
         print(json_data)
         # copy family or range into group key (makes everything uniform later on).
-        for key in PRODUCT_GROUPS.values():
-            if json_data.get(key):
-                json_data[GROUPS]
+        # for key in PRODUCT_GROUPS.values():
+        #     if json_data.get(key):
+        #         json_data[GROUPS]
 
         product_name = json_data.get('name')
         print(product_name)
@@ -137,7 +172,7 @@ def products():
 
 
         # create common objects for product
-        group, _ = get_or_create(Group, name=GROUPS[api_key])
+        group, _ = get_or_create(Group, name=json_data[PRODUCT_GROUPS[api_key]])
 
         tag_names = json_data.get('tags')
         tags = get_or_create_multiple(Tag, data=tag_names)
