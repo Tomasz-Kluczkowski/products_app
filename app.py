@@ -1,12 +1,12 @@
 import json
 from http import HTTPStatus
 
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from sqlalchemy import exists
 from sqlalchemy_utils import database_exists
 
 from database.database import db_session, init_db
-from database.models.models import Allergen, Customer, FoodProduct, Group, Material, Product, Tag
+from database.models.models import Product
 from utils import get_or_create, get_or_create_multiple, get_class_by_table_name
 
 app = Flask(__name__)
@@ -77,6 +77,7 @@ BASE_FIELDS = {
 
 if not database_exists('sqlite:///products.db'):
     init_db()
+init_db()
 
 
 @app.teardown_appcontext
@@ -181,8 +182,7 @@ class ProductCreator:
 
 @app.route('/products', methods=['GET', 'POST'])
 def products():
-    api_key = request.headers['X-API-KEY']
-    print(api_key)
+    product_type = request.headers['X-API-KEY']
     if request.method == 'POST':
         json_data = request.get_json()
         if json_data is None:
@@ -190,15 +190,26 @@ def products():
             return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
         print(json_data)
         product_name = json_data.get('name')
-        print(product_name)
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
-            return 'Product already in database'
+            return 'Product already in database, use PUT or PATCH methods to amend.'
 
-        product_creator = ProductCreator(data=json_data, product_type=api_key)
+        product_creator = ProductCreator(data=json_data, product_type=product_type)
         product_creator.create_product_from_data()
-        return 'Product created', HTTPStatus.CREATED
+
+        product_class = get_class_by_table_name(f'{product_type}_product')
+
+        # TODO: REMOVE BELOW ONCE TESTING DONE!!!
+        retrieved_products = product_class.query.all()
+        print(retrieved_products)
+        # return json.dumps(retrieved_products)
+        return jsonify(retrieved_products)
+
+
+
+        # return 'Product created', HTTPStatus.CREATED
     else:
         # Retrieve all products here
-
-        retrieved_products = []
+        product_class = get_class_by_table_name(f'{product_type}_product')
+        retrieved_products = product_class.query.all()
+        print(retrieved_products)
         return json.dumps(retrieved_products)
