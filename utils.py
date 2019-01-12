@@ -32,8 +32,6 @@ def get_or_create_multiple(model, data):
     """
     objs = []
     for item in data:
-        print('data in get_or_create_multiple', data)
-
         obj = None
         if isinstance(data, list):
             obj, _ = get_or_create(model, name=item)

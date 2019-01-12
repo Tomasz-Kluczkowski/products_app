@@ -1,15 +1,27 @@
-import json
 from http import HTTPStatus
 
 from flask import Flask, request, jsonify
+from flask.json import JSONEncoder
 from sqlalchemy import exists
 from sqlalchemy_utils import database_exists
+from sqlalchemy.ext.declarative import DeclarativeMeta
 
 from database.database import db_session, init_db
 from database.models.models import Product
 from utils import get_or_create, get_or_create_multiple, get_class_by_table_name
 
+
+class CustomJSONEncoder(JSONEncoder):
+
+    def default(self, obj):
+        if isinstance(obj.__class__, DeclarativeMeta):
+            return obj.to_dict()
+        return super(CustomJSONEncoder, self).default(obj)
+
+
 app = Flask(__name__)
+app.json_encoder = CustomJSONEncoder
+
 
 # industry keys
 FOOD = 'food'
@@ -95,7 +107,7 @@ class ProductCreator:
         self.product_type = product_type
         self.objects = {}
         self._cleanse_data()
-        
+
     def _cleanse_data(self):
         """
         Convert json key names to system names (for family/range -> group and billOfMaterials -> materials).
@@ -196,20 +208,11 @@ def products():
         product_creator = ProductCreator(data=json_data, product_type=product_type)
         product_creator.create_product_from_data()
 
-        product_class = get_class_by_table_name(f'{product_type}_product')
-
-        # TODO: REMOVE BELOW ONCE TESTING DONE!!!
-        retrieved_products = product_class.query.all()
-        print(retrieved_products)
-        # return json.dumps(retrieved_products)
-        return jsonify(retrieved_products)
-
-
-
-        # return 'Product created', HTTPStatus.CREATED
+        return 'Product created', HTTPStatus.CREATED
     else:
         # Retrieve all products here
         product_class = get_class_by_table_name(f'{product_type}_product')
-        retrieved_products = product_class.query.all()
-        print(retrieved_products)
-        return json.dumps(retrieved_products)
+        if product_class:
+            retrieved_products = product_class.query.all()
+            return jsonify(retrieved_products)
+        return 'No data for this product type found. Please check your API_KEY', HTTPStatus.NOT_FOUND

@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Table, ForeignKey, FLOAT
 from sqlalchemy.orm import relationship
 
 from database.database import Base
+from serializer import OutputMixin
 
 
 class NameBase:
@@ -11,7 +12,7 @@ class NameBase:
     name = Column(String(50), unique=True)
 
 
-class Group(Base, NameBase):
+class Group(Base, OutputMixin, NameBase):
     """
     Group model for products (i.e: family, range etc.) - more specific classification than Type.
     """
@@ -19,7 +20,7 @@ class Group(Base, NameBase):
     id = Column(Integer, primary_key=True)
 
 
-class Tag(Base, NameBase):
+class Tag(Base, OutputMixin, NameBase):
     """
     Tag model for products.
     """
@@ -27,7 +28,7 @@ class Tag(Base, NameBase):
     id = Column(Integer, primary_key=True)
 
 
-class Material(Base, NameBase):
+class Material(Base, OutputMixin, NameBase):
     """
     Model of material of a product. (i. e. sugar, grams, 20)
     """
@@ -38,7 +39,7 @@ class Material(Base, NameBase):
     product_id = Column(Integer, ForeignKey('product.id'))
 
 
-class Allergen(Base, NameBase):
+class Allergen(Base, OutputMixin, NameBase):
     """
     Model for an allergen in food product.
     """
@@ -46,7 +47,7 @@ class Allergen(Base, NameBase):
     id = Column(Integer, primary_key=True)
 
 
-class Customer(Base, NameBase):
+class Customer(Base, OutputMixin, NameBase):
     """
     Model for customer.
     """
@@ -62,11 +63,12 @@ product_tag = Table(
 )
 
 
-class Product(Base, NameBase):
+class Product(Base, OutputMixin, NameBase):
     """
     Base product model to be extended by specific product types.
     """
     __tablename__ = 'product'
+    RELATIONSHIPS_TO_DICT = True
     id = Column(Integer, primary_key=True)
     group_id = Column(Integer, ForeignKey('group.id'))
     group = relationship('Group', backref='products')
