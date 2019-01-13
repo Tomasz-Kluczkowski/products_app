@@ -49,6 +49,18 @@ test_textile_data = {
 
 
 @pytest.mark.usefixtures("recreate_database")
+class TestAPICommon:
+
+    def test_unknown_api_key(self):
+        with app.test_client() as c:
+            response = c.post(
+                '/products', json=test_food_data, content_type='application/json', headers={'x_api_key': 'skeleton_key'}
+            )
+            assert response.status_code == 403
+            assert response.data == b'Unknown API key. Please check your API key.'
+
+
+@pytest.mark.usefixtures("recreate_database")
 class TestFoodProducts:
 
     def test_add_food_product(self):

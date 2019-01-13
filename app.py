@@ -27,6 +27,8 @@ app.json_encoder = CustomJSONEncoder
 FOOD = 'food'
 TEXTILES = 'textile'
 
+INDUSTRY_KEYS = [FOOD, TEXTILES]
+
 # product field keys (also some are corresponding table names)
 NAME = 'name'
 TAGS = 'tags'
@@ -85,6 +87,19 @@ OBJECT_NAMES = {
 BASE_FIELDS = {
     FOOD_PRODUCT: [NAME, GROUP, CUSTOMER],
     TEXTILE_PRODUCT: [NAME, GROUP, COLOUR],
+}
+
+# messages keys
+UNKNOWN_API_KEY = 'unknown_api_key'
+DUPLICATE_PRODUCT = 'duplicate_product'
+PRODUCT_CREATED = 'product_created'
+NO_JSON = 'no_json'
+
+MESSAGES = {
+    UNKNOWN_API_KEY: 'Unknown API key. Please check your API key.',
+    DUPLICATE_PRODUCT: 'Product already in database, use PUT or PATCH methods to amend.',
+    PRODUCT_CREATED: 'Product created',
+    NO_JSON: 'No JSON body supplied',
 }
 
 if not database_exists('sqlite:///products.db'):
@@ -194,23 +209,24 @@ class ProductCreator:
 @app.route('/products', methods=['GET', 'POST'])
 def products():
     product_type = request.headers['X-API-KEY']
+    if product_type not in INDUSTRY_KEYS:
+        return MESSAGES[UNKNOWN_API_KEY], HTTPStatus.FORBIDDEN
     if request.method == 'POST':
         json_data = request.get_json()
         if json_data is None:
-            print('no json data')
-            return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
+            return MESSAGES[NO_JSON], HTTPStatus.BAD_REQUEST
         product_name = json_data.get('name')
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
-            return 'Product already in database, use PUT or PATCH methods to amend.'
+            return MESSAGES[DUPLICATE_PRODUCT], HTTPStatus.CONTINUE
 
         product_creator = ProductCreator(data=json_data, product_type=product_type)
         product_creator.create_product_from_data()
 
-        return 'Product created', HTTPStatus.CREATED
+        return MESSAGES[PRODUCT_CREATED], HTTPStatus.CREATED
     else:
         # Retrieve all products here
         product_class = get_class_by_table_name(f'{product_type}_product')
         if product_class:
             retrieved_products = product_class.query.all()
             return jsonify(retrieved_products)
-        return 'No data for this product type found. Please check your API_KEY.', HTTPStatus.NOT_FOUND
+        return MESSAGES[UNKNOWN_API_KEY], HTTPStatus.NOT_FOUND
