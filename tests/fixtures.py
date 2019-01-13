@@ -8,7 +8,7 @@ from app import app
 @pytest.fixture
 def client():
     # This fixture accesses main database.
-    # TODO: use temporary database
+    # TODO: find a way to use temporary database
     Base.metadata.drop_all(engine)
     init_db()
     app.config["TESTING"] = True
