@@ -42,3 +42,14 @@ flake8
 ```bash
 pytest
 ```
+
+## Adding new factories
+The app is now flexible enough to accept a new type of product as long as we follow the basic setup:
+1. In app.py
+- Add new api key for the new industry
+- Add new api key to INDUSTRY_KEYS list
+- Add any new field names to product field keys
+- Add corresponding singular table key names (these you will use to map objects to correct tables)
+- Most likely you new product will belong to some collection (range, group, selection etc.) which we want to save as 
+group in the database - add appropriate collection name to PRODUCT_GROUPS.
+- Add object group key if you need to create product specific objects in the database.
