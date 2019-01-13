@@ -37,3 +37,8 @@ Note: pep8 is followed but line length is 120.
 ```bash
 flake8
 ```
+
+## Testing
+```bash
+pytest
+```

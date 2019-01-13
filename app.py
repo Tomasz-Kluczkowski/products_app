@@ -213,4 +213,4 @@ def products():
         if product_class:
             retrieved_products = product_class.query.all()
             return jsonify(retrieved_products)
-        return 'No data for this product type found. Please check your API_KEY', HTTPStatus.NOT_FOUND
+        return 'No data for this product type found. Please check your API_KEY.', HTTPStatus.NOT_FOUND
