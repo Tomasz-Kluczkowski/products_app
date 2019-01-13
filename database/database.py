@@ -9,8 +9,5 @@ Base.query = db_session.query_property()
 
 
 def init_db():
-    # TODO: REMOVE ONCE TESTING DONE!!!
-    Base.metadata.drop_all(engine)
-    # TODO: REMOVE ABOVE!!!
     import database.models.models # noqa
     Base.metadata.create_all(bind=engine)

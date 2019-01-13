@@ -25,7 +25,7 @@ app.json_encoder = CustomJSONEncoder
 
 # industry keys
 FOOD = 'food'
-TEXTILES = 'textiles'
+TEXTILES = 'textile'
 
 # product field keys (also some are corresponding table names)
 NAME = 'name'
@@ -89,7 +89,6 @@ BASE_FIELDS = {
 
 if not database_exists('sqlite:///products.db'):
     init_db()
-init_db()
 
 
 @app.teardown_appcontext
@@ -180,7 +179,7 @@ class ProductCreator:
         self._create_objects(OBJECT_NAMES[PRODUCT_DEPENDENT])
 
         # create industry specific dependent objects.
-        related_fields = RELATED_FIELDS
+        related_fields = list(RELATED_FIELDS)
         if OBJECT_NAMES[INDUSTRY_DEPENDENT].get(self.product_type):
             industry_dependent_obj_names = OBJECT_NAMES[INDUSTRY_DEPENDENT][self.product_type]
             self._create_objects(industry_dependent_obj_names)
@@ -200,7 +199,6 @@ def products():
         if json_data is None:
             print('no json data')
             return 'No JSON body supplied', HTTPStatus.BAD_REQUEST
-        print(json_data)
         product_name = json_data.get('name')
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
             return 'Product already in database, use PUT or PATCH methods to amend.'
