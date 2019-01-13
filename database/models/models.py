@@ -107,7 +107,7 @@ class TextileProduct(Product):
     """
     Textile product model class.
     """
-    __tablename__ = 'textile_product'
+    __tablename__ = 'textiles_product'
     id = Column(Integer, ForeignKey('product.id'), primary_key=True)
     colour = Column(String(50))
     __mapper_args__ = {

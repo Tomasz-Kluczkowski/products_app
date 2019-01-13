@@ -6,7 +6,7 @@ from sqlalchemy import exists
 from sqlalchemy_utils import database_exists
 from sqlalchemy.ext.declarative import DeclarativeMeta
 
-from database.database import db_session, init_db
+from database.database import db_session, init_db, Base, engine
 from database.models.models import Product
 from utils import get_or_create, get_or_create_multiple, get_class_by_table_name
 
@@ -23,11 +23,13 @@ app = Flask(__name__)
 app.json_encoder = CustomJSONEncoder
 
 
-# industry keys
-FOOD = 'food'
-TEXTILES = 'textile'
+# CONFIG KEYS AND NAMES
 
+# Industry API keys - add any new industries here first.
+FOOD = 'food'
+TEXTILES = 'textiles'
 INDUSTRY_KEYS = [FOOD, TEXTILES]
+
 
 # product field keys (also some are corresponding table names)
 NAME = 'name'
@@ -48,16 +50,10 @@ ALLERGEN = 'allergen'
 MATERIAL = 'material'
 PRODUCT = 'product'
 
-PRODUCT_GROUPS = {
-    FOOD: FAMILY,
-    TEXTILES: RANGE
-}
-
 # object group keys
-PRODUCT_RELATIONS = 'product_relations'
 INDEPENDENT = 'independent'
 FOOD_PRODUCT = 'food_product'
-TEXTILE_PRODUCT = 'textile_product'
+TEXTILES_PRODUCT = 'textiles_product'
 PRODUCT_DEPENDENT = 'product_dependent'
 INDUSTRY_DEPENDENT = 'industry_dependent'
 
@@ -69,24 +65,37 @@ TABLE_NAMES = {
     MATERIALS: MATERIAL,
     ALLERGENS: ALLERGEN,
     FOOD_PRODUCT: FOOD_PRODUCT,
-    TEXTILE_PRODUCT: TEXTILE_PRODUCT,
+    TEXTILES_PRODUCT: TEXTILES_PRODUCT,
 }
 
-# field keys required for product relations
-RELATED_FIELDS = [TAGS, MATERIALS]
+# product config keys
+ALL_FIELDS = 'all_fields'  # all fields required for the product as they come through json.
+BASE_FIELDS = 'base_fields'  # minimum set of fields that the product needs to be saved to the db.
+MULTI_RELATIONS = 'multi_relations'  # fields which are to be added as multiple product relations.
+SINGLE_RELATIONS = 'single_relations'  # all fields to add as product's related fields once their objects are persisted.
+PRODUCT_GROUP = 'product_group'  # conversion from customer name for the group to system name (i.e family = group)
 
-OBJECT_NAMES = {
-    INDEPENDENT: [TAGS, GROUP, CUSTOMER],
-    PRODUCT_RELATIONS: [TAGS, GROUP, CUSTOMER, MATERIALS, ALLERGENS],
-    PRODUCT_DEPENDENT: [MATERIALS],
-    INDUSTRY_DEPENDENT: {
-        FOOD: [ALLERGENS]
+PRODUCT_CONFIG = {
+    FOOD: {
+        ALL_FIELDS: [NAME, TAGS, FAMILY, CUSTOMER, BILL_OF_MATERIALS, ALLERGENS],
+        BASE_FIELDS: [NAME, GROUP, CUSTOMER],
+        INDEPENDENT: [TAGS, GROUP, CUSTOMER],
+        SINGLE_RELATIONS: [GROUP, CUSTOMER],
+        PRODUCT_DEPENDENT: [MATERIALS],
+        INDUSTRY_DEPENDENT: [ALLERGENS],
+        PRODUCT_GROUP: FAMILY,
+        MULTI_RELATIONS: [TAGS, MATERIALS]
     },
-}
-
-BASE_FIELDS = {
-    FOOD_PRODUCT: [NAME, GROUP, CUSTOMER],
-    TEXTILE_PRODUCT: [NAME, GROUP, COLOUR],
+    TEXTILES: {
+        ALL_FIELDS: [NAME, TAGS, RANGE, BILL_OF_MATERIALS, COLOUR],
+        BASE_FIELDS: [NAME, GROUP, COLOUR],
+        INDEPENDENT: [TAGS, GROUP],
+        SINGLE_RELATIONS: [GROUP],
+        PRODUCT_DEPENDENT: [MATERIALS],
+        INDUSTRY_DEPENDENT: None,
+        PRODUCT_GROUP: RANGE,
+        MULTI_RELATIONS: [TAGS, MATERIALS]
+    }
 }
 
 # messages keys
@@ -122,15 +131,36 @@ class ProductCreator:
         self.data = data
         self.product_type = product_type
         self.objects = {}
-        self._cleanse_data()
+        self.product_config = PRODUCT_CONFIG[product_type]
+
+    def get_json_fields(self):
+        """
+        Obtain a set of json fields supplied by the user.
+        :return: set, set of fields in the json data.
+        """
+        json_fields = set()
+        for field in self.data:
+            json_fields.add(field)
+        return json_fields
+
+    def check_all_fields_present(self, json_fields):
+        """
+        :param json_fields: set, set of json fields against which we need to make the check.
+        Confirm all required fields present in json data supplied by the user.
+        :return: bool, True if all fields present, False otherwise.
+        """
+        all_fields = set(self.product_config[ALL_FIELDS])
+        return all_fields == json_fields
 
     def _cleanse_data(self):
         """
-        Convert json key names to system names (for family/range -> group and billOfMaterials -> materials).
+        Convert json field names to system names (for family/range -> group and billOfMaterials -> materials).
         """
-        product_group = PRODUCT_GROUPS[self.product_type]
+        product_group = self.product_config[PRODUCT_GROUP]
         self.data[GROUP] = self.data[product_group]
+        del(self.data[product_group])
         self.data[MATERIALS] = self.data[BILL_OF_MATERIALS]
+        del(self.data[BILL_OF_MATERIALS])
 
     def _create_base_product(self):
         """
@@ -142,8 +172,8 @@ class ProductCreator:
         if product_class:
             # build kwargs for product
             product_kwargs = {}
-            for field in BASE_FIELDS[f'{self.product_type}_product']:
-                if field in OBJECT_NAMES[PRODUCT_RELATIONS]:
+            for field in self.product_config[BASE_FIELDS]:
+                if field in self.product_config[SINGLE_RELATIONS]:
                     product_kwargs[field] = self.objects[field]
                 else:
                     product_kwargs[field] = self.data[field]
@@ -172,7 +202,7 @@ class ProductCreator:
                 if object_class:
                     if multiple:
                         # inject product id into data dictionary for objects that need it as a field.
-                        if obj_name in OBJECT_NAMES[PRODUCT_DEPENDENT]:
+                        if obj_name in self.product_config[PRODUCT_DEPENDENT]:
                             for key, value in data.items():
                                 value['product_id'] = self.objects['product_id']
                         self.objects[obj_name] = get_or_create_multiple(object_class, data=data)
@@ -185,43 +215,54 @@ class ProductCreator:
         """
         Creates product and required objects it depends on from data.
         """
+        # Normalize field names to system names.
+        self._cleanse_data()
         # create independent objects first: tags, group (family, range), customer as they do not need
         # anything to exist.
-        self._create_objects(OBJECT_NAMES[INDEPENDENT])
+        self._create_objects(self.product_config[INDEPENDENT])
 
         # create product dependencies in database (ids will be needed to save the product object in next step)
         db_session.flush()
         base_product = self._create_base_product()
         # now create product dependent objects (those need product_id.
-        self._create_objects(OBJECT_NAMES[PRODUCT_DEPENDENT])
+        self._create_objects(self.product_config[PRODUCT_DEPENDENT])
 
         # create industry specific dependent objects.
-        related_fields = list(RELATED_FIELDS)
-        if OBJECT_NAMES[INDUSTRY_DEPENDENT].get(self.product_type):
-            industry_dependent_obj_names = OBJECT_NAMES[INDUSTRY_DEPENDENT][self.product_type]
-            self._create_objects(industry_dependent_obj_names)
-            related_fields.extend(industry_dependent_obj_names)
+        multi_relations = self.product_config[MULTI_RELATIONS]
+        if self.product_config.get(INDUSTRY_DEPENDENT):
+            industry_dependent_relations = self.product_config[INDUSTRY_DEPENDENT]
+            self._create_objects(industry_dependent_relations)
+            multi_relations.extend(industry_dependent_relations)
         # append dependent objects to product
-        for field in related_fields:
+        for relation in multi_relations:
             # add objects to appropriate fields
-            getattr(base_product, field).extend(self.objects[field])
+            getattr(base_product, relation).extend(self.objects[relation])
         db_session.commit()
 
 
 @app.route('/products', methods=['GET', 'POST'])
 def products():
     product_type = request.headers['X-API-KEY']
+    # confirm correct API key used.
     if product_type not in INDUSTRY_KEYS:
         return MESSAGES[UNKNOWN_API_KEY], HTTPStatus.FORBIDDEN
     if request.method == 'POST':
         json_data = request.get_json()
+        # Abort if no data supplied.
         if json_data is None:
             return MESSAGES[NO_JSON], HTTPStatus.BAD_REQUEST
         product_name = json_data.get('name')
+        # Abort if product already exists.
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
             return MESSAGES[DUPLICATE_PRODUCT], HTTPStatus.BAD_REQUEST
 
         product_creator = ProductCreator(data=json_data, product_type=product_type)
+        # confirm all fields present before doing any work.
+        # TODO: add info for customer - which fields are missing in the message.
+        json_fields = product_creator.get_json_fields()
+        if not product_creator.check_all_fields_present(json_fields):
+            return MESSAGES[INCORRECT_DATA], HTTPStatus.BAD_REQUEST
+
         product_creator.create_product_from_data()
 
         return MESSAGES[PRODUCT_CREATED], HTTPStatus.CREATED

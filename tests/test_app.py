@@ -68,6 +68,13 @@ class TestAPICommon:
         assert response.status_code == 403
         assert response.data == b'Unknown API key. Please check your API key.'
 
+    def test_post_incorrect_data(self, client):
+        response = client.post(
+            '/products', json={"name": "Tommy Boy"}, content_type='application/json', headers={'x_api_key': 'food'}
+        )
+        assert response.status_code == 400
+        assert response.data == b'Incorrect product data supplied.'
+
 
 class TestFoodProducts:
 
@@ -119,27 +126,27 @@ class TestFoodProducts:
 class TestTextileProducts:
     def test_add_textile_product(self, client):
         response = client.post(
-            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textile'}
+            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textiles'}
         )
         assert response.status_code == 201
         assert response.data == b'Product created'
 
     def test_duplicated_textile_product_rejected(self, client):
         client.post(
-            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textile'}
+            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textiles'}
         )
         response = client.post(
-            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textile'}
+            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textiles'}
         )
         assert response.status_code == 400
         assert response.data == b'Product already in database, use PUT or PATCH methods to amend.'
 
     def test_retrieve_textile_product(self, client):
         client.post(
-            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textile'}
+            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textiles'}
         )
         response = client.get(
-            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textile'}
+            '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textiles'}
         )
         assert response.status_code == 200
         json_data = json.loads(response.data)

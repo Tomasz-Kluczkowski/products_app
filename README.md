@@ -22,14 +22,14 @@ FLASK_APP=app.py  FLASK_ENV=development flask run
 curl localhost:5000/products -d '{"name": "Chorizo", "tags": ["spicy", "spanish"], "customer": "Deans Butchers", "family": "sausage", "allergens": ["cereals"], "billOfMaterials": {"paprika": {"quantity": 100, "units": "tablespoons"}, "pork mince": {"quantity": 10, "units": "kg"}}}' -H 'Content-Type: application/json' -H "X_API_KEY: food"
 
 # textile product
-curl localhost:5000/products -d '{"name": "Baggy Jeans", "tags": ["baggy", "modern"], "colour": "maroon", "range": "jeans", "billOfMaterials": {"cloth": {"quantity": 10, "units": "runnning metres"}, "string": {"quantity": 12, "units": "metres"}}}' -H 'Content-Type: application/json' -H "X_API_KEY: textile"
+curl localhost:5000/products -d '{"name": "Baggy Jeans", "tags": ["baggy", "modern"], "colour": "maroon", "range": "jeans", "billOfMaterials": {"cloth": {"quantity": 10, "units": "runnning metres"}, "string": {"quantity": 12, "units": "metres"}}}' -H 'Content-Type: application/json' -H "X_API_KEY: textiles"
 
 ```
 
 ## Test reading the api
 ```bash
 curl localhost:5000/products -H 'Content-Type: application/json' -H "X_API_KEY: food"
-curl localhost:5000/products -H 'Content-Type: application/json' -H "X_API_KEY: textile"
+curl localhost:5000/products -H 'Content-Type: application/json' -H "X_API_KEY: textiles"
 ```
 
 ## Check lint issues
