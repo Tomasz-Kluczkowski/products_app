@@ -94,12 +94,14 @@ UNKNOWN_API_KEY = 'unknown_api_key'
 DUPLICATE_PRODUCT = 'duplicate_product'
 PRODUCT_CREATED = 'product_created'
 NO_JSON = 'no_json'
+INCORRECT_DATA = 'incorrect_data'
 
 MESSAGES = {
     UNKNOWN_API_KEY: 'Unknown API key. Please check your API key.',
     DUPLICATE_PRODUCT: 'Product already in database, use PUT or PATCH methods to amend.',
     PRODUCT_CREATED: 'Product created',
     NO_JSON: 'No JSON body supplied',
+    INCORRECT_DATA: 'Incorrect product data supplied.'
 }
 
 if not database_exists('sqlite:///products.db'):
@@ -190,7 +192,7 @@ class ProductCreator:
         # create product dependencies in database (ids will be needed to save the product object in next step)
         db_session.flush()
         base_product = self._create_base_product()
-        # now create common product dependent objects.
+        # now create product dependent objects (those need product_id.
         self._create_objects(OBJECT_NAMES[PRODUCT_DEPENDENT])
 
         # create industry specific dependent objects.
@@ -199,7 +201,7 @@ class ProductCreator:
             industry_dependent_obj_names = OBJECT_NAMES[INDUSTRY_DEPENDENT][self.product_type]
             self._create_objects(industry_dependent_obj_names)
             related_fields.extend(industry_dependent_obj_names)
-        # append dependant objects to product
+        # append dependent objects to product
         for field in related_fields:
             # add objects to appropriate fields
             getattr(base_product, field).extend(self.objects[field])
@@ -217,7 +219,7 @@ def products():
             return MESSAGES[NO_JSON], HTTPStatus.BAD_REQUEST
         product_name = json_data.get('name')
         if product_name and db_session.query(exists().where(Product.name == product_name)).scalar():
-            return MESSAGES[DUPLICATE_PRODUCT], HTTPStatus.CONTINUE
+            return MESSAGES[DUPLICATE_PRODUCT], HTTPStatus.BAD_REQUEST
 
         product_creator = ProductCreator(data=json_data, product_type=product_type)
         product_creator.create_product_from_data()

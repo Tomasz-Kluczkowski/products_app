@@ -2,7 +2,6 @@ import pytest
 
 from app import app
 
-
 test_food_data = {
     "name": "Chorizo",
     "family": "sausage",
@@ -59,6 +58,22 @@ class TestAPICommon:
             assert response.status_code == 403
             assert response.data == b'Unknown API key. Please check your API key.'
 
+    def test_no_json(self):
+        with app.test_client() as c:
+            response = c.post(
+                '/products', json=None, content_type='application/json', headers={'x_api_key': 'food'}
+            )
+            assert response.status_code == 400
+            assert response.data == b'No JSON body supplied'
+
+    def test_retrieve_unknown_product(self):
+        with app.test_client() as c:
+            response = c.get(
+                '/products', content_type='application/json', headers={'x_api_key': 'skeleton_key'}
+            )
+            assert response.status_code == 403
+            assert response.data == b'Unknown API key. Please check your API key.'
+
 
 @pytest.mark.usefixtures("recreate_database")
 class TestFoodProducts:
@@ -79,7 +94,7 @@ class TestFoodProducts:
             response = c.post(
                 '/products', json=test_food_data, content_type='application/json', headers={'x_api_key': 'food'}
             )
-            assert response.status_code == 200
+            assert response.status_code == 400
             assert response.data == b'Product already in database, use PUT or PATCH methods to amend.'
 
 
@@ -102,6 +117,6 @@ class TestTextileProducts:
             response = c.post(
                 '/products', json=test_textile_data, content_type='application/json', headers={'x_api_key': 'textile'}
             )
-            assert response.status_code == 200
+            assert response.status_code == 400
             assert response.data == b'Product already in database, use PUT or PATCH methods to amend.'
 
