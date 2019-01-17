@@ -58,8 +58,8 @@ class ProductCreator:
 
     def check_all_fields_present(self, json_fields):
         """
-        :param json_fields: set, set of json fields against which we need to make the check.
         Confirm all required fields present in json data supplied by the user.
+        :param json_fields: set, set of json fields against which we need to make the check.
         :return: bool, True if all fields present, False otherwise.
         """
         all_fields = set(self.product_config[ALL_FIELDS])
