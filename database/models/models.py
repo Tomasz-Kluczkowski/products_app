@@ -28,12 +28,13 @@ class Tag(Base, OutputMixin, NameBase):
     id = Column(Integer, primary_key=True)
 
 
-class Material(Base, OutputMixin, NameBase):
+class Material(Base, OutputMixin):
     """
     Model of material of a product. (i. e. sugar, grams, 20)
     """
     __tablename__ = 'material'
     id = Column(Integer, primary_key=True)
+    name = Column(String(50))
     quantity = Column(FLOAT)
     units = Column(String(50))
     product_id = Column(Integer, ForeignKey('product.id'))
